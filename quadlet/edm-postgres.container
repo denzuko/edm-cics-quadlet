@@ -1,34 +1,36 @@
 [Unit]
 Description=EDM PostgreSQL database
-After=edm-cics-network.service
-Requires=edm-cics-network.service
+After=edm-cics-network.service edm-pgdata-volume.service
+Requires=edm-cics-network.service edm-pgdata-volume.service
 
 [Container]
-# Official postgres image -- no custom builds.
 Image=docker.io/postgres:16-alpine
 ContainerName=edm-postgres
 
-# Credentials from environment (override in ~/.config/containers/edm.env)
+# Credentials from drop-in env file — never inline passwords
 EnvironmentFile=%h/.config/containers/edm.env
-Environment=POSTGRES_USER=bricks
-Environment=POSTGRES_DB=bricks
 
-# Persistent data volume -- survives container restarts
+# Named volume backed by ZFS dataset storage/containers/edm-postgres
+# Pre-create: zfs create storage/containers/edm-postgres
+#             podman volume create --opt type=none --opt o=bind \
+#               --opt device=/storage/containers/edm-postgres edm-pgdata
 Volume=edm-pgdata.volume:/var/lib/postgresql/data:Z
 
-# Internal network only -- not exposed externally
 Network=edm-cics.network
 
-# Health check: pg_isready with 10s start period
 HealthCmd=pg_isready -U bricks -d bricks
 HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=5
 HealthStartPeriod=30s
 
+# No published ports — Postgres is internal only
+# HAProxy handles external TLS if needed
+
 [Service]
 Restart=on-failure
 RestartSec=5s
+TimeoutStartSec=120
 
 [Install]
 WantedBy=edm-cics.target

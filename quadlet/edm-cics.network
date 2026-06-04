@@ -1,6 +1,8 @@
 [Network]
-# Internal network for EDM CICS stack
-# No external DNS leakage; BRICKS and Postgres communicate internally.
+# Internal bridge network for EDM CICS stack.
+# No external exposure — HAProxy terminates externally.
+Subnet=10.89.10.0/24
+Gateway=10.89.10.1
 
 [Install]
 WantedBy=default.target

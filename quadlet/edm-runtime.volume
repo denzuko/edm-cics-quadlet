@@ -1,0 +1,13 @@
+[Volume]
+# Backed by ZFS dataset: storage/users/edm-runtime
+# Pre-create:
+#   zfs create storage/users/edm-runtime
+#   rsync -a /path/to/edm-cics/runtime/ /storage/users/edm-runtime/
+#   podman volume create --opt type=none --opt o=bind \
+#     --opt device=/storage/users/edm-runtime edm-runtime
+
+Driver=local
+Options=type=none,o=bind,device=/storage/users/edm-runtime
+
+[Install]
+WantedBy=default.target

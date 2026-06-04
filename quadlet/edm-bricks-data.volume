@@ -1,5 +1,12 @@
 [Volume]
-# Persistent storage for BRICKS_TS bbolt database and TS queues.
+# Backed by ZFS dataset: storage/containers/edm-bricks
+# Pre-create:
+#   zfs create storage/containers/edm-bricks
+#   podman volume create --opt type=none --opt o=bind \
+#     --opt device=/storage/containers/edm-bricks edm-bricks-data
+
+Driver=local
+Options=type=none,o=bind,device=/storage/containers/edm-bricks
 
 [Install]
 WantedBy=default.target

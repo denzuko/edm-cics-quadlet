@@ -1,6 +1,12 @@
 [Volume]
-# Persistent storage for PostgreSQL data directory.
-# Survives container restarts and upgrades.
+# Backed by ZFS dataset: storage/containers/edm-postgres
+# Pre-create:
+#   zfs create storage/containers/edm-postgres
+#   podman volume create --opt type=none --opt o=bind \
+#     --opt device=/storage/containers/edm-postgres edm-pgdata
+
+Driver=local
+Options=type=none,o=bind,device=/storage/containers/edm-postgres
 
 [Install]
 WantedBy=default.target
