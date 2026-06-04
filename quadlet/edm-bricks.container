@@ -4,12 +4,12 @@ After=edm-postgres.service
 Requires=edm-postgres.service
 
 [Container]
-# BRICKS_TS image from denzuko/BRICKS_TS-docker
-# Build locally: podman build -t localhost/bricks:latest bricks/
-Image=localhost/bricks:latest
+# Pull from ghcr.io -- built and pushed by .github/workflows/build.yml
+# on every commit to master that touches the bricks/ submodule.
+Image=ghcr.io/denzuko/bricks_ts:latest
 ContainerName=edm-bricks
 
-# Environment: postgres vars map to BRICKS db_* config via entrypoint.sh
+# Credentials: postgres vars map to BRICKS db_* config via entrypoint.sh
 EnvironmentFile=%h/.config/containers/edm.env
 Environment=POSTGRES_HOST=edm-postgres
 Environment=POSTGRES_USER=bricks
@@ -18,11 +18,10 @@ Environment=BRICKS_start_web3270=yes
 Environment=BRICKS_web3270_port=9000
 
 # Bind-mount EDM COBOL/REXX source and SQL DDL (read-only)
-# edm-cics/ submodule provides runtime/ and sql/
 Volume=%h/edm-cics-quadlet/edm-cics/runtime:/srv/bricks/runtime:ro,Z
 Volume=%h/edm-cics-quadlet/edm-cics/sql:/srv/bricks/sql:ro,Z
 
-# Persistent BRICKS data directory (KSDS bbolt files, TS queues)
+# Persistent BRICKS data (bbolt files, TS queues)
 Volume=edm-bricks-data.volume:/srv/bricks/data:Z
 
 # Port bindings

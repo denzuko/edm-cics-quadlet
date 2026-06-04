@@ -13,7 +13,7 @@ mkdir -p "${QUADLET_DIR}" "${ENV_DIR}"
 # Copy unit files
 for f in "${SCRIPT_DIR}/quadlet/"*; do
     cp "$f" "${QUADLET_DIR}/"
-    echo "    installed: $(basename $f)"
+    printf "    installed: %s\n" "$(basename "$f")"
 done
 
 # Install env file if not already present
@@ -24,10 +24,11 @@ else
     echo "    skipped: edm.env already exists"
 fi
 
-# Build the BRICKS image from submodule
-echo "==> Building BRICKS_TS image..."
-podman build -t localhost/bricks:latest "${SCRIPT_DIR}/bricks/" || {
-    echo "WARNING: podman build failed -- pull image manually or fix Dockerfile"
+# Pull BRICKS image from ghcr.io
+echo "==> Pulling BRICKS_TS image from ghcr.io..."
+podman pull ghcr.io/denzuko/bricks_ts:latest || {
+    echo "WARNING: ghcr.io pull failed."
+    echo "         Build locally: podman build -t ghcr.io/denzuko/bricks_ts:latest bricks/"
 }
 
 echo ""
