@@ -1,0 +1,6 @@
+[Network]
+# Internal network for EDM CICS stack
+# No external DNS leakage; BRICKS and Postgres communicate internally.
+
+[Install]
+WantedBy=default.target

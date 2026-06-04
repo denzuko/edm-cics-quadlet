@@ -1,0 +1,6 @@
+[Volume]
+# Persistent storage for PostgreSQL data directory.
+# Survives container restarts and upgrades.
+
+[Install]
+WantedBy=default.target

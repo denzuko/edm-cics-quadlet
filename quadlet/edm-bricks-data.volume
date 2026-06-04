@@ -1,0 +1,5 @@
+[Volume]
+# Persistent storage for BRICKS_TS bbolt database and TS queues.
+
+[Install]
+WantedBy=default.target

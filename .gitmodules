@@ -1,0 +1,6 @@
+[submodule "bricks"]
+	path = bricks
+	url = https://github.com/denzuko/BRICKS_TS-docker.git
+[submodule "edm-cics"]
+	path = edm-cics
+	url = https://github.com/denzuko/edm-cics.git
