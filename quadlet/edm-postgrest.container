@@ -1,0 +1,32 @@
+[Unit]
+Description=EDM PostgREST API gateway
+After=edm-postgres.service
+Requires=edm-postgres.service
+
+[Container]
+# PostgREST exposes the EDM PostgreSQL schema as a REST API.
+# Used for: BMAC webhooks (issue #10), external integrations,
+# pg_notify consumer endpoints.
+Image=docker.io/postgrest/postgrest:v12
+ContainerName=edm-postgrest
+
+EnvironmentFile=%h/.config/containers/edm.env
+
+# PostgREST config via environment
+Environment=PGRST_DB_URI=postgres://bricks:${POSTGRES_PASSWORD}@edm-postgres:5432/edm
+Environment=PGRST_DB_SCHEMA=public
+Environment=PGRST_DB_ANON_ROLE=web_anon
+Environment=PGRST_SERVER_PORT=3000
+Environment=PGRST_JWT_SECRET=${PGRST_JWT_SECRET}
+
+# Internal only — HAProxy or external proxy terminates TLS
+PublishPort=127.0.0.1:3000:3000
+
+Network=edm-cics.network
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=edm-cics.target
