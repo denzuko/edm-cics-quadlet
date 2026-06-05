@@ -94,3 +94,45 @@ setup() {
     [ "$status" -eq 0 ]
     [ "$output" = "f" ]
 }
+
+@test "edm-postgrest container is running" {
+    run podman ps --filter name=edm-postgrest --format '{{.Status}}'
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Up" ]]
+}
+
+@test "PostgREST API responds on port 3000" {
+    run curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
+    [ "$status" -eq 0 ]
+    [ "$output" = "200" ]
+}
+
+@test "public_shows view is readable without auth" {
+    run curl -s -o /dev/null -w "%{http_code}"         http://localhost:3000/public_shows
+    [ "$status" -eq 0 ]
+    [ "$output" = "200" ]
+}
+
+@test "print_queue table exists" {
+    run podman exec edm-postgres psql -U bricks -d edm -tAc         "SELECT 1 FROM information_schema.tables WHERE table_name='print_queue'"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+}
+
+@test "webhook_events table exists" {
+    run podman exec edm-postgres psql -U bricks -d edm -tAc         "SELECT 1 FROM information_schema.tables WHERE table_name='webhook_events'"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+}
+
+@test "rpt_client_list() function exists" {
+    run podman exec edm-postgres psql -U bricks -d edm -tAc         "SELECT COUNT(*) FROM pg_proc WHERE proname='rpt_client_list'"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+}
+
+@test "process_print_queue() function exists" {
+    run podman exec edm-postgres psql -U bricks -d edm -tAc         "SELECT COUNT(*) FROM pg_proc WHERE proname='process_print_queue'"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+}
