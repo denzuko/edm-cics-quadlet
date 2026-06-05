@@ -1,7 +1,7 @@
 [Unit]
 Description=EDM CICS Transaction Processing Stack
 Documentation=https://github.com/denzuko/edm-cics-quadlet
-After=edm-postgres.service edm-bricks.service
+After=edm-postgres.service edm-bricks.service edm-postgrest.service
 Requires=edm-postgres.service edm-bricks.service
 
 [Install]

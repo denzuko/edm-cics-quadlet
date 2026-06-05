@@ -81,6 +81,18 @@ for vol_ds in     "edm-pgdata:/${ZFS_POOL}/containers/edm-postgres"     "edm-bri
     fi
 done
 
+# Apply PostgREST database roles
+echo "==> Applying PostgREST roles (EDM-POSTGREST.sql)..."
+if command -v psql >/dev/null 2>&1; then
+    PGPASSWORD="${POSTGRES_PASSWORD:-brickspassword}" psql \
+        -h "${PGHOST:-localhost}" -U "${PGUSER:-bricks}" \
+        -d "${PGDATABASE:-edm}" \
+        -f "${SCRIPT_DIR}/edm-cics/sql/EDM-POSTGREST.sql" \
+        --on-error-continue 2>&1 || echo "WARNING: PostgREST SQL completed with errors"
+else
+    echo "WARNING: psql not found -- run EDM-POSTGREST.sql manually"
+fi
+
 # Pull BRICKS image
 echo "==> Pulling ghcr.io/denzuko/bricks_ts:latest..."
 podman pull ghcr.io/denzuko/bricks_ts:latest ||     echo "WARNING: pull failed — run manually before starting"

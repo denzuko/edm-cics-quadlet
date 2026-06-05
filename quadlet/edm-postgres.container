@@ -20,7 +20,7 @@ Volume=edm-pgdata.volume:/var/lib/postgresql/data:Z
 # /docker-entrypoint-initdb.d/ on first start against a fresh volume.
 # Bind-mount the EDM sql/ directory (from edm-cics submodule) here.
 # Files run in filename order: EDM-DDL.sql -> EDM-HELPDESK.sql ->
-# EDM-MAILQ.sql -> EDM-DPR.sql
+# EDM-MAILQ.sql -> EDM-DPR.sql -> EDM-PRINT.sql -> EDM-POSTGREST.sql
 # On subsequent starts (volume already populated) initdb is skipped.
 Volume=%h/edm-cics-quadlet/edm-cics/sql:/docker-entrypoint-initdb.d:ro,Z
 
