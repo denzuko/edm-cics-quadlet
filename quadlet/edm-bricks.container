@@ -1,15 +1,16 @@
 [Unit]
 Description=EDM BRICKS_TS transaction server
-After=edm-postgres.service
+After=edm-postgres.service edm-bricks-data-volume.service
 Requires=edm-postgres.service
 
 [Container]
-# Pull from ghcr.io -- built and pushed by .github/workflows/build.yml
-# on every commit to master that touches the bricks/ submodule.
 Image=ghcr.io/denzuko/bricks_ts:latest
 ContainerName=edm-bricks
 
-# Credentials: postgres vars map to BRICKS db_* config via entrypoint.sh
+# Auto-update from ghcr.io on systemctl --user start
+# Run: podman auto-update to pull latest and restart
+AutoUpdate=registry
+
 EnvironmentFile=%h/.config/containers/edm.env
 Environment=POSTGRES_HOST=edm-postgres
 Environment=POSTGRES_USER=bricks
@@ -17,23 +18,32 @@ Environment=POSTGRES_DB=bricks
 Environment=BRICKS_start_web3270=yes
 Environment=BRICKS_web3270_port=9000
 
-# Bind-mount EDM COBOL/REXX source and SQL DDL (read-only)
-Volume=%h/edm-cics-quadlet/edm-cics/runtime:/srv/bricks/runtime:ro,Z
-Volume=%h/edm-cics-quadlet/edm-cics/sql:/srv/bricks/sql:ro,Z
+# Runtime source: named volume backed by ZFS dataset
+# storage/users/edm-runtime (read-write for operator edits)
+# Pre-create: zfs create storage/users/edm-runtime
+#             populate with edm-cics repo contents
+#             podman volume create --opt type=none --opt o=bind \
+#               --opt device=/storage/users/edm-runtime edm-runtime
+Volume=edm-runtime.volume:/srv/bricks/runtime:Z
 
-# Persistent BRICKS data (bbolt files, TS queues)
+# SQL DDL: named volume backed by ZFS dataset storage/users/edm-sql
+Volume=edm-sql.volume:/srv/bricks/sql:ro,Z
+
+# Persistent BRICKS data: bbolt files, TS queues
+# storage/containers/edm-bricks
 Volume=edm-bricks-data.volume:/srv/bricks/data:Z
 
-# Port bindings
-PublishPort=2300:2300
-PublishPort=9000:9000
+# Internal only — HAProxy terminates TLS externally on 2300/9000
+# and forwards to these internal ports
+PublishPort=127.0.0.1:2300:2300
+PublishPort=127.0.0.1:9000:9000
 
-# Internal network for Postgres communication
 Network=edm-cics.network
 
 [Service]
 Restart=on-failure
 RestartSec=10s
+TimeoutStartSec=60
 
 [Install]
 WantedBy=edm-cics.target

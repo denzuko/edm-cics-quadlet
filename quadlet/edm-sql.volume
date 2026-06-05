@@ -1,0 +1,13 @@
+[Volume]
+# Backed by ZFS dataset: storage/users/edm-sql (read-only mount)
+# Pre-create:
+#   zfs create storage/users/edm-sql
+#   cp /path/to/edm-cics/sql/*.sql /storage/users/edm-sql/
+#   podman volume create --opt type=none --opt o=bind \
+#     --opt device=/storage/users/edm-sql edm-sql
+
+Driver=local
+Options=type=none,o=bind,device=/storage/users/edm-sql
+
+[Install]
+WantedBy=default.target
