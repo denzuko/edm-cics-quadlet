@@ -1,0 +1,277 @@
+# kubernetes/edm-cics.yml
+# EDM CICS Stack — Kubernetes manifests
+#
+# Prerequisites:
+#   kubectl create secret generic edm-cics-secrets \
+#     --from-literal=POSTGRES_PASSWORD=changeme \
+#     --namespace=edm-cics
+#
+# Deploy:
+#   kubectl apply -f kubernetes/edm-cics.yml
+#
+# Access:
+#   kubectl port-forward svc/bricks 9000:9000 -n edm-cics   # web3270
+#   kubectl port-forward svc/bricks 2300:2300 -n edm-cics   # raw 3270
+#
+# For production ingress, configure your ingress controller against
+# svc/bricks port 9000 and update TLS accordingly.
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: edm-cics
+  labels:
+    app.kubernetes.io/part-of: edm-cics
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: edm-cics-config
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/part-of: edm-cics
+data:
+  POSTGRES_DB: edmcics
+  POSTGRES_USER: edmcics
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  BRICKS_enforce_secure_login: "yes"
+
+---
+# Create this secret out-of-band; do not commit credentials to git.
+# kubectl create secret generic edm-cics-secrets \
+#   --from-literal=POSTGRES_PASSWORD=changeme \
+#   --namespace=edm-cics
+#
+# Shown here as a placeholder only — replace with Sealed Secrets,
+# External Secrets Operator, or Vault if running in production.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: edm-cics-secrets
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/part-of: edm-cics
+  annotations:
+    # Remove this annotation and manage externally in production.
+    helm.sh/resource-policy: keep
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "changeme_override_via_kubectl"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgdata
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/part-of: edm-cics
+    app.kubernetes.io/component: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: edm-cics
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  strategy:
+    type: Recreate   # single-node PVC; no rolling update
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: edm-cics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          envFrom:
+            - configMapRef:
+                name: edm-cics-config
+            - secretRef:
+                name: edm-cics-secrets
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: sql-init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "edmcics", "-d", "edmcics"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "edmcics", "-d", "edmcics"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: pgdata
+        - name: sql-init
+          configMap:
+            name: edm-cics-sql-init
+            optional: true   # graceful if no init SQL provided
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: edm-cics
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  clusterIP: None   # headless; bricks connects by name
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bricks
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/name: bricks
+    app.kubernetes.io/part-of: edm-cics
+    app.kubernetes.io/component: transaction-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bricks
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bricks
+        app.kubernetes.io/part-of: edm-cics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres 5432; do
+                echo "waiting for postgres..."; sleep 2
+              done
+      containers:
+        - name: bricks
+          image: ghcr.io/denzuko/bricks_ts:latest
+          envFrom:
+            - configMapRef:
+                name: edm-cics-config
+            - secretRef:
+                name: edm-cics-secrets
+          ports:
+            - containerPort: 9000
+              name: web3270
+            - containerPort: 2300
+              name: tn3270
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          livenessProbe:
+            tcpSocket:
+              port: 2300
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket:
+              port: 2300
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bricks
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/name: bricks
+    app.kubernetes.io/part-of: edm-cics
+spec:
+  selector:
+    app.kubernetes.io/name: bricks
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: web3270
+    - port: 2300
+      targetPort: 2300
+      name: tn3270
+  type: ClusterIP
+
+---
+# Optional: expose web3270 externally via LoadBalancer.
+# Comment out or replace with an Ingress for production.
+apiVersion: v1
+kind: Service
+metadata:
+  name: bricks-lb
+  namespace: edm-cics
+  labels:
+    app.kubernetes.io/name: bricks
+    app.kubernetes.io/part-of: edm-cics
+  annotations:
+    # Remove if not on a cloud provider with LB support.
+    service.beta.kubernetes.io/load-balancer-source-ranges: "0.0.0.0/0"
+spec:
+  selector:
+    app.kubernetes.io/name: bricks
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: web3270
+    - port: 2300
+      targetPort: 2300
+      name: tn3270
+  type: LoadBalancer

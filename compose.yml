@@ -1,0 +1,110 @@
+# compose.yml — EDM CICS Stack
+# Compatible with: docker compose v2, podman-compose, docker stack deploy (Swarm)
+#
+# The image ships with sane defaults for all config values.
+# No .env file is required to start. Copy .env.example to .env
+# only if you need to override the defaults (passwords, TLS, etc.).
+#
+# Quick start (compose):
+#   docker compose up -d
+#
+# With overrides:
+#   cp .env.example .env && $EDITOR .env && docker compose up -d
+#
+# Swarm deploy:
+#   docker stack deploy -c compose.yml edm-cics
+#
+# Ports:
+#   9000  — web3270 (browser)
+#   2300  — raw 3270 emulator (c3270, x3270, tn3270)
+
+name: edm-cics
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Image defaults are sufficient for local/dev use.
+    # Override via .env if needed (see .env.example).
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-edmcics}
+      POSTGRES_USER: ${POSTGRES_USER:-edmcics}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edmcics_dev}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-edmcics} -d ${POSTGRES_DB:-edmcics}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 512m
+
+  bricks:
+    image: ghcr.io/denzuko/bricks_ts:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      BRICKS_enforce_secure_login: ${BRICKS_enforce_secure_login:-yes}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-edmcics}
+      POSTGRES_USER: ${POSTGRES_USER:-edmcics}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edmcics_dev}
+    ports:
+      - "9000:9000"   # web3270
+      - "2300:2300"   # raw 3270
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 256m
+
+  haproxy:
+    image: haproxy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./haproxy:/usr/local/etc/haproxy:ro
+    networks:
+      - backend
+    depends_on:
+      - bricks
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  backend:
+    driver: bridge
+    # Swarm overlay — uncomment for multi-node:
+    # driver: overlay
+    # attachable: true
