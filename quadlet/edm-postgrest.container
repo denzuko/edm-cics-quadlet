@@ -24,6 +24,18 @@ PublishPort=127.0.0.1:3000:3000
 
 Network=edm-cics.network
 
+# net.matrix CMDB identity labels — Change Item attribution
+Label=net.matrix.organization=daplanet
+Label=net.matrix.orgunit=dps
+Label=net.matrix.owner=FC13F74B@matrix.net
+Label=net.matrix.oid=iso.org.dod.internet.42387
+Label=net.matrix.duns=iso.org.duns.039271257
+Label=net.matrix.customer=PVT-01
+Label=net.matrix.costcenter=INT-01
+Label=net.matrix.environment=production
+Label=net.matrix.application=edm-cics-quadlet
+Label=net.matrix.role=postgrest-api
+
 [Service]
 Restart=on-failure
 RestartSec=10s
